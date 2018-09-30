@@ -1,34 +1,60 @@
-# Managing networks hasn't changed in 30 years
+# Ansibleのネットワークモジュール
 
-- Networks are mission critical
-- Every network is a unique snowflake
-- Ad-hoc changes that proliferate
-- Vendor specific implementations
-- Testing is expensive/impossible
+設定変更するモジュールは次の動作を行う
 
-Note: TODO - check on branding/lettering
+1. リモートデバイスに接続
+1. 設定情報を採取
+1. 差分設定を生成
+1. リモートデバイスに設定を投入
 
----
-
-# According to Gartner
+とても便利だけど・・・
 
 ---
 
-# Automation considerations
+# 差分生成機能だけを使いたい
 
-- Compute is no longer the slowest link in the chain
-- Businesses demand that networks deliver at the speed of cloud
-- Automation of repeatable tasks
-- Bridge silos
+こうしたい
 
-Note: TODO - Transition slide from problem to solution.
+- 予め採取しておいたコンフィグと比較して差分コンフィグを生成したい
+- 流し込む手段と切り離したい
 
 ---
 
-# What is Ansible
+# ローカルモジュール
 
-Red Hat Ansible network automation is enterprise software for automating and managing IT infrastructure.
+コアモジュールの改造は難しそうなので、差分設定を生成するだけのモジュールを作成
 
-As a vendor agnostic framework Ansible can automate Arista (EOS), Cisco (IOS, IOS XR, NX-OS), Juniper (JunOS), Open vSwitch and VyOS.
+ローカルホストだけで完結するのでローカルモジュールと呼ぶことにする
 
-Ansible Tower is an enterprise framework for controlling, securing and managing your Ansible automation with a **UI and RESTful API.**
+---
+
+# 使い方
+
+- running_configに既存の設定を指定
+- interfacesに希望する状態を指定
+
+```yaml
+tasks:
+  - name: create config to be pushed
+    ios_interface_local:
+      running_config: "{{ running_config }}"
+      interfaces: "{{ interfaces }}"
+    register: r
+```
+
+こんなコンフィグが得られる
+
+```bash
+"commands": [
+    "interface GigabitEthernet3",
+    "no description",
+    "description configured by ansible",
+    "mtu 1512",
+    "interface GigabitEthernet4",
+    "no negotiation auto",
+    "speed 1000",
+    "interface Loopback0",
+    "description configured by ansible",
+    "shutdown"
+]
+```

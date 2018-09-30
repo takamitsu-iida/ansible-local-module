@@ -111,58 +111,61 @@ presentは存在することを期待し、absentは存在しないことを期�
   vars:
     running_config: |
       !
+      interface Loopback0
+       ip address 192.168.254.1 255.255.255.255
+      !
       interface GigabitEthernet3
-       description 2018-08-14T09:28:49Z
-       ip address 3.3.3.3 255.255.255.0
-       standby version 2
-       standby 1 ip 3.3.3.1
-       standby 1 ip 3.3.3.250 secondary
-       standby 1 ip 3.3.3.254 secondary
-       standby 1 preempt delay minimum 60 reload 180 sync 60
-       standby 1 authentication cisco2
-       negotiation auto
+       description configured by hand
+       ip address 33.33.33.33 255.255.255.0
+       no negotiation auto
+       speed 1000
+       cdp enable
+       mtu 1512
        no mop enabled
        no mop sysid
       !
       interface GigabitEthernet4
-       description 2018-08-14T09:28:49Z
-       ip address 4.4.4.4 255.255.255.0
+       description configured by hand
+       ip address 44.44.44.44 255.255.255.0
        negotiation auto
+       cdp enable
        no mop enabled
        no mop sysid
       !
 
     interfaces:
-      - bame: GigabitEthernet3
-        group: 1
-        version: 2
-        priority: 100
-        preempt: enabled
-        vip: 3.3.3.2  # 変更
-        secondary:
-          - 3.3.3.250
-          - 3.3.3.253
-        auth_type: text
-        auth_string: cisco
+
+      - name: GigabitEthernet3
+        description: configured by ansible
+        negotiation:
+        speed:
+        # duplex: is not supported on CSR1000v
+        # duplex:
+        mtu: 1512
+        shutdown: false
         state: present
-        purge: true
 
       - name: GigabitEthernet4
-        group: 1
-        version: 1
-        vip: 4.4.4.1
-        auth_type: md5
-        auth_string: cisco
+        negotiation: false
+        speed: 1000
         state: present
 
+      - name: Loopback0
+        description: configured by ansible
+        shutdown: true
+        state: present
+
+
   tasks:
+
+    # - include_vars: vars/r1.yml
 
     #
     # TEST 1
     #
 
     - name: create config to be pushed
-      ios_hsrp_local:
+      ios_interface_local:
         running_config: "{{ running_config }}"
         interfaces: "{{ interfaces }}"
         debug: true
@@ -184,16 +187,14 @@ ok: [localhost] => {
         "changed": false,
         "commands": [
             "interface GigabitEthernet3",
-            "standby 1 ip 3.3.3.2",
-            "standby 1 ip 3.3.3.253 secondary",
-            "no standby 1 ip 3.3.3.254 secondary",
-            "no standby 1 preempt delay",
-            "standby 1 preempt",
-            "no standby 1 authentication",
-            "exit",
+            "no description",
+            "description configured by ansible",
+            "mtu 1512",
             "interface GigabitEthernet4",
-            "standby 1 ip 4.4.4.1",
-            "standby 1 authentication md5 key-string cisco",
-            "exit"
-        ],
+            "no negotiation auto",
+            "speed 1000",
+            "interface Loopback0",
+            "description configured by ansible",
+            "shutdown"
+        ]
 ```
