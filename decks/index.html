@@ -18,18 +18,8 @@ https://takamitsu-iida.github.io/ansible-local-module/
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <title>reveal.jsの練習</title>
-
-  <link ref="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/reveal.css">
-  <!-- <link rel="stylesheet" href="css/reveal.css"> -->
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/theme/white.css">
-  <!-- <link rel="stylesheet" href="css/theme/black.css"> -->
-
-  <!-- Theme used for syntax highlighting of code -->
-  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/lib/css/zenburn.css"> -->
-  <!-- <link rel="stylesheet" href="lib/css/zenburn.css"> -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.6.0/themes/prism.min.css">
-
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/css/reveal.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/css/theme/white.css">
 
   <!-- Printing and PDF exports -->
   <script>
@@ -64,8 +54,8 @@ https://takamitsu-iida.github.io/ansible-local-module/
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/lib/js/head.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/js/reveal.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/lib/js/head.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/js/reveal.js"></script>
 
   <script>
     // More info about config & dependencies:
@@ -73,13 +63,10 @@ https://takamitsu-iida.github.io/ansible-local-module/
     // - https://github.com/hakimel/reveal.js#dependencies
     Reveal.initialize({
       dependencies: [
-        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/markdown/marked.js' },
-        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/markdown/markdown.js' },
-        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/notes/notes.js', async: true },
-        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/highlight/highlight.js',
-          async: true,
-          callback: function () { hljs.initHighlightingOnLoad(); }
-        }
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/plugin/markdown/marked.js' },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/plugin/markdown/markdown.js' },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/plugin/notes/notes.js', async: true },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
       ],
 
       // Display presentation control arrows
