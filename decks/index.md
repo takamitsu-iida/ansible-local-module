@@ -8,11 +8,11 @@
 
 Note: TODO - check on branding/lettering
 
-===
+---
 
 # According to Gartner
 
-===
+---
 
 # Automation considerations
 
@@ -23,7 +23,7 @@ Note: TODO - check on branding/lettering
 
 Note: TODO - Transition slide from problem to solution.
 
-===
+---
 
 # What is Ansible
 
