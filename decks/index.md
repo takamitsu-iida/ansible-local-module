@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD037 -->
+
 # Ansibleローカルモジュール
 
 <br>
