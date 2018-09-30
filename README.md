@@ -202,7 +202,8 @@ ios_configモジュールは親子関係を指定する必要があるため少�
 ```
 
 <br>
+<br>
 
-# reveal.jsの練習
+# reveal.jsの個人的練習
 
-[decks](decks/index.html)
+[decks](https://takamitsu-iida.github.io/ansible-local-module/decks/index.html)
