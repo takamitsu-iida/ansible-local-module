@@ -12,7 +12,7 @@ Note: TODO - check on branding/lettering
 
 # According to Gartner
 
----
+
 
 # Automation considerations
 
