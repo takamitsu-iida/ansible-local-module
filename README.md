@@ -81,36 +81,56 @@ Cisco IOSルータを対象にしたローカルモジュールです。
 
 <br>
 
-## ios_hsrp_local
+## ios_interface_local
 
-[説明](README_hsrp.md)
+[説明　README_interface.md](README_interface.md)
 
+インタフェース内のパラメータを設定するローカルモジュールです。
 
+現在は以下のパラメータを設定できます。
+不足するパラメータは必要に応じてモジュールを改造すればいいでしょう。
 
+- description
+- negotiation
+- speed
+- duplex
+- mtu
+- shutdown
 
 <br>
 
 ## ios_interface_address_local
 
-[説明](README_interface_address.md)
+[説明　README_interface_address.md](README_interface_address.md)
+
+インタフェースにIPアドレスを設定するローカルモジュールです。
+セカンダリアドレスにも対応しています。
 
 <br>
 
-## ios_interface_local
+## ios_hsrp_local
 
-[説明](README_interface.md)
+[説明　README_hsrp.md](README_hsrp.md)
+
+HSRPの設定コマンドを生成するローカルモジュールです。
 
 <br>
 
 ## ios_static_route_local
 
-[説明](README_static_route.md)
+[説明　README_static_route.md](README_static_route.md)
+
+スティックルートの設定を生成するローカルモジュールです。
+スタティックルートが大量にある場合に便利です。
 
 <br>
 
 ## ios_ip_acl_local
 
-[説明](README_ip_acl.md)
+[説明　README_ip_acl.md](README_ip_acl.md)
+
+ip access-listの中身を管理します。
+順番の入れ替えや追加、削除といった操作はどうしても間違えがちなので、このモジュールで差分コンフィグを生成した方が安全でしょう。
 
 <br>
 
@@ -122,26 +142,38 @@ IOS Catalystを対象にしたローカルモジュールです。
 
 ## ios_vlan_local
 
-[説明](README_vlan.md)
+[説明　README_vlan.md](README_vlan.md)
+
+VANの定義は','や'-'を使った変則的なコマンド入力になりますのでどうしても間違えやすいです。
+このモジュールで差分コンフィグを生成した方が安全でしょう。
+
+<br>
 
 ## ios_interface_trunk_local
 
-[説明](README_interface_trunk.md)
+[説明　README_interface_trunk.md](README_interface_trunk.md)
+
+インタフェースにVLANを通す、通さない、といった設定変更は間違えやすいものの一つです。
+このモジュールで差分コンフィグを生成した方が安全でしょう。
 
 <br>
 
 ## ios_linkagg_local
 
-[README_linkagg.md](README_linkagg.md)
+[説明　README_linkagg.md](README_linkagg.md)
+
+リンクアグリゲーションの設定は複数の物理インタフェースに設定することになりますので、手作業で変更すると間違えやすいです。
+このモジュールで差分コンフィグを生成した方が安全でしょう。
 
 <br>
 
-# コンフィグの流し込み
+# IOSデバイスへのコンフィグの流し込み
 
 ローカルモジュールで生成した差分コンフィグをリモートデバイスに流し込むには、独自に作成した`ios_cfg`モジュールを使います。
 
 ios_configモジュールは親子関係を指定する必要があるため少々使いづらく、しばしば期待通りになりません。
 
+使い方
 
 ```yaml
 - name: apply config to the remote device
