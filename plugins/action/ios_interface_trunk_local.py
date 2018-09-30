@@ -1,0 +1,718 @@
+# -*- coding: utf-8 -*-
+# pylint: disable=E0611,C0111
+# E0611:No name 'urllib' in module '_MovedItems'
+# C0111:Missing class docstring
+
+# (c) 2018, Takamitsu IIDA (@takamitsu-iida)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+import os
+import re
+
+from ansible.plugins.action.normal import ActionModule as _ActionModule
+from ansible.module_utils._text import to_text
+from ansible.module_utils.six.moves.urllib.parse import urlsplit
+from ansible.module_utils.network.common.config import NetworkConfig
+
+try:
+  # pylint: disable=W0611
+  # W0611:Unused display imported from __main__
+  from __main__ import display
+except ImportError:
+  # pylint: disable=C0412
+  # C0412:Imports from package ansible are not grouped
+  from ansible.utils.display import Display
+  display = Display()
+
+
+class ActionModule(_ActionModule):
+
+  supported_params = ('mode', 'access_vlan', 'native_vlan', 'trunk_vlans', 'nonegotiate')
+
+
+  @staticmethod
+  def search_obj_in_list(name, lst):
+    for o in lst:
+      if o['name'] == name:
+        return o
+    return None
+
+
+  @staticmethod
+  def get_interface_type(name):
+    intf_type = 'unknown'
+
+    if name.upper()[:2] in ('ET', 'FA', 'GI'):
+      intf_type = 'ethernet'
+    elif name.upper().startswith('VL'):
+      intf_type = 'svi'
+    elif name.upper().startswith('LO'):
+      intf_type = 'loopback'
+    elif name.upper()[:2] in ('MG', 'MA'):
+      intf_type = 'management'
+    elif name.upper().startswith('PO'):
+      intf_type = 'portchannel'
+    elif name.upper().startswith('NV'):
+      intf_type = 'nve'
+
+    return intf_type
+
+
+  @staticmethod
+  def normalize_interafce_name(name):
+    match = re.search(r'Gi(\d.*)', name)
+    if match:
+      name = 'GigabitEthernet' + match.group(1)
+    match = re.search(r'Fa(\d.*)', name)
+    if match:
+      name = 'FastEthernet' + match.group(1)
+    return name
+
+
+  @staticmethod
+  def vlan_str_to_list(vlan_str):
+    if vlan_str is None:
+      return None
+
+    # ensure vlan_str is string type
+    if not isinstance(vlan_str, str):
+      vlan_str = str(vlan_str)
+
+    # convert 'ALL' to 1-4094
+    if vlan_str.lower() == 'all':
+      vlan_str = '1-4094'
+
+    result = []
+    if vlan_str:
+      for part in vlan_str.split(','):
+        if part.lower() == 'none':
+          break
+        if '-' in part:
+          start, stop = (int(i) for i in part.split('-'))
+          result.extend(range(start, stop + 1))
+        else:
+          result.append(int(part))
+
+    return sorted(result)
+
+
+  @staticmethod
+  def vlan_list_to_str(vlan_list):
+    vlan_list = sorted(vlan_list)
+    results = []
+    start = None
+    stop = None
+
+    for item in vlan_list:
+      if not start:
+        start = item
+      else:
+        if not stop:
+          if item == start + 1:
+            stop = item
+          else:
+            results.append(str(start))
+            start = item
+        else:
+          if item == stop + 1:
+            stop = item
+          else:
+            results.append(str(start) + '-' + str(stop))
+            start = item
+            stop = None
+
+    if start and stop:
+      results.append(str(start) + '-' + str(stop))
+    elif start:
+      results.append(str(start))
+
+    return ','.join(results)
+
+
+  @staticmethod
+  def parse_config_argument(configobj, name, arg=None):
+
+    # nameで指定したインタフェース配下のコンフィグを取り出す
+    parent = 'interface {}'.format(name)
+    cfg = configobj[parent]
+    cfg = '\n'.join(cfg.children)
+
+    # 正規表現argに一致し、その後ろに続く文字列を返す
+    match = re.search(r'{} (.+)$'.format(arg), cfg, re.M)
+    if match:
+      return match.group(1)
+
+
+  @staticmethod
+  def parse_config_argument_all(configobj, name, arg=None):
+
+    # nameで指定したインタフェース配下のコンフィグを取り出す
+    parent = 'interface {}'.format(name)
+    cfg = configobj[parent]
+    cfg = '\n'.join(cfg.children)
+
+    values = []
+    matches = re.finditer(r'{} (.+)$'.format(arg), cfg, re.M)
+    for match in matches:
+      match_str = match.group(1).strip()
+      values.append(match_str)
+
+    return values
+
+
+  @staticmethod
+  def map_show_vlan_to_obj(show_vlan):
+    vlans = set()
+    lines = show_vlan.splitlines()
+    for line in lines:
+      match = re.search(r'^(\d+)\s', line)
+      if match:
+        # vlan id is stored as int
+        vlans.add(int(match.group(1)))
+
+    return sorted(list(vlans))
+
+
+  @staticmethod
+  def parse_show_interfaces_switchport(show_interfaces_switchport):
+    # インタフェースごとに分割したリストを返す
+
+    if not show_interfaces_switchport:
+      return []
+
+    results = []
+    sections = []
+    lines = show_interfaces_switchport.splitlines()
+    for line in lines:
+      if line.strip() == '':
+        continue
+
+      match = re.search(r'^Name:', line)
+      if match:
+        if sections:
+          section = '\n'.join(sections)
+          results.append(section)
+          sections = []
+      sections.append(line)
+
+    if sections:
+      section = '\n'.join(sections)
+      results.append(section)
+
+    return results
+
+
+  def map_show_interfaces_switchport_to_obj(self, show_interfaces_switchport):
+    results = []
+
+    sections = self.parse_show_interfaces_switchport(show_interfaces_switchport)
+    for section in sections:
+
+      # show interface switchportの出力ではインタフェース名が省略語になっているので変換する
+      # Gi0/1 -> GigabitEthernet0/1
+      name = re.search(r'Name: (.*)$', section, re.M).group(1)
+      name = self.normalize_interafce_name(name)
+
+      mode = re.search(r'Administrative Mode: (?:.* )?(\w+)$', section, re.M).group(1)
+      switchport = re.search(r'Switchport: (\S+)$', section, re.M).group(1)
+      access = re.search(r'Access Mode VLAN: (\d+)', section).group(1)
+      native = re.search(r'Trunking Native Mode VLAN: (\d+)', section).group(1)
+      trunk = re.search(r'Trunking VLANs Enabled: (.+)$', section, re.M).group(1)
+
+      # negotiationはboolに変換
+      negotiation = re.search(r'Negotiation of Trunking: (\S+)$', section, re.M).group(1)
+      nonegotiate = bool(negotiation == 'Off')
+
+      results.append({
+        'name': name,
+        'mode': mode,
+        'switchport': switchport,
+        'nonegotiate': nonegotiate,  # bool
+        'access_vlan': access,
+        'native_vlan': native,
+        'trunk_vlans': trunk
+      })
+
+      # {
+      #     "access_vlan": "2",
+      #     "mode": "access",
+      #     "name": "GigabitEthernet0/1",
+      #     "native_vlan": "1",
+      #     "negotiation": "False",
+      #     "switchport": "Enabled",
+      #     "trunk_vlans": "1-4094"
+      # },
+
+    return results
+
+
+  def map_config_to_obj(self, config):
+
+    # ほとんどの情報はshow interfaces switchportから読み取るので、
+    # running-configはチャネルが設定されているかどうか、しか見ない
+
+    results = []
+
+    match = re.findall(r'^interface (\S+)', config, re.M)
+    if not match:
+      return results
+
+    configobj = NetworkConfig(indent=1, contents=config)
+
+    for item in set(match):
+      # 'channel-group'で始まるコマンドのオプションを取り出す。コマンドがなければNone
+      channel_group = self.parse_config_argument(configobj, item, 'channel-group')
+
+      obj = {
+        'name': item,
+        'channel_group': channel_group,
+        'state': 'present'
+      }
+      results.append(obj)
+
+    return results
+
+
+  def args_to_obj(self, args):
+    obj = {}
+    for p in self.supported_params:
+      # そのパラメータが入力したYAMLにある場合だけwantに取り込む
+      if p in args:
+        obj[p] = args.get(p)
+
+    # stateは設定されていない場合'present'の扱いにする
+    obj['state'] = args.get('state', 'present')
+
+    return obj
+
+
+  def map_params_to_obj(self):
+    results = []
+
+    # 一覧を渡された場合
+    interfaces = self._task.args.get('interfaces')
+    if interfaces and isinstance(interfaces, list):
+      for item in interfaces:
+        obj = self.args_to_obj(item)
+        obj['name'] = item.get('name')
+        results.append(obj)
+      return results
+
+    # aggregateとして複数渡された場合
+    aggregate = self._task.args.get('aggregate')
+    if aggregate and isinstance(aggregate, list):
+      for item in aggregate:
+        # インタフェースの数だけパラメータオブジェクトを作成してからaggregateの内容を追記する
+        obj = self.args_to_obj(self._task.args)
+        obj.update(item)
+        results.append(obj)
+      return results
+
+    # パラメータだけが指定された場合
+    obj = self.args_to_obj(self._task.args)
+    obj['name'] = self._task.args.get('name')
+    results.append(obj)
+
+    return results
+
+
+  def to_commands_unconfigured(self, have):
+    cmds = []
+
+    all_default = all([
+      bool(str(have.get('access_vlan')) == '1'),
+      bool(str(have.get('native_vlan')) == '1'),
+      bool(str(have.get('trunk_vlans')) == 'ALL'),
+      bool(have.get('mode') == 'access' or have.get('mode') == 'auto')
+    ])
+
+    if not all_default:
+      cmds.append('no switchport trunk encapsulation')
+      cmds.append('no switchport nonegotiate')
+      cmds.append('no switchport mode')
+      cmds.append('no switch access vlan')
+      cmds.append('no switchport trunk native vlan')
+      cmds.append('no switchport trunk allowed vlan')
+
+    return cmds
+
+
+  def to_commands_absent(self, want, have):
+    cmds = []
+
+    want_mode = want.get('mode')
+
+    if want_mode == 'access':
+      # 指定されたaccess vlanが存在しない(absentの)状態にする -> デフォルトの状態にする
+      have_access_vlan = str(have.get('access_vlan'))
+      if have_access_vlan != '1':
+        cmds.append('no switchport access vlan')
+
+    elif want_mode == 'trunk':
+
+      want_trunk_vlans = None if want.get('trunk_vlans') is None else str(want.get('trunk_vlans'))
+      have_trunk_vlans = str(have.get('trunk_vlans'))
+      want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
+      have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
+
+      # (1) want, have = none, 2-3     --> do nothing
+      # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
+      # (3) want, have = 2-3, 'ALL'    --> switchport trunk allowed vlan remove 2-3
+      # (4) want, have = 2,3, 2,3,4,5  --> switchport trunk allowed vlan remove 2-3
+
+      if want_trunk_vlans is None:
+        # (1)
+        pass
+      elif want_trunk_list != have_trunk_list:
+
+        if want_trunk_vlans == 'ALL':
+          # (2)
+          cmds.append('no switchport trunk allowed vlan')
+        else:
+          if have_trunk_vlans == 'ALL':
+            # (3)
+            cmd = 'switchport trunk allowed vlan remove {0}'.format(want_trunk_vlans)
+            cmds.append(cmd)
+          else:
+            # (4)
+            vlans_to_del = set(want_trunk_list).intersection(have_trunk_list)
+            if vlans_to_del:
+              vlans_to_del = self.vlan_list_to_str(vlans_to_del)
+              cmd = 'switchport trunk allowed vlan remove {0}'.format(vlans_to_del)
+              cmds.append(cmd)
+
+      # no switchport trunk native vlan
+      # native vlanをabsentする、すなわちデフォルトに戻す。数字は何を指定しても同じ。
+      want_native_vlan = None if want.get('native_vlan') is None else str(want.get('native_vlan'))
+      have_native_vlan = have.get('native_vlan')
+      if want_native_vlan is not None:
+        if have_native_vlan != '1':
+          cmds.append('no switchport trunk native vlan')
+
+      # no switchport nonegotiate
+      # absentなので、switchport nonegotiateが設置されていないのが正しい状態
+      want_nonegotiate = None if want.get('nonegotiate') is None else want.get('nonegotiate')
+      have_nonegotiate = have.get('nonegotiate')
+      if want_nonegotiate is not None:
+        if want_nonegotiate == have_nonegotiate and want_nonegotiate is True:
+          cmds.append('no switchport nonegotiate')
+        elif want_nonegotiate == have_nonegotiate and want_nonegotiate is False:
+          cmds.append('switchport nonegotiate')
+
+    return cmds
+
+
+  def to_commands_present(self, want, have):
+
+    cmds = []
+
+    # switchport mode access
+    # switchport mode trunk
+    want_mode = want.get('mode')
+    have_mode = have.get('mode')
+    if want_mode != have_mode:
+      if want_mode == 'trunk':
+        cmds.append('switchport trunk encapsulation dot1q')
+        cmds.append('switchport mode trunk')
+      elif want_mode == 'access':
+        cmds.append('switchport mode access')
+
+    # switchport access vlan
+    if want_mode == 'access':
+      want_access_vlan = str(want.get('access_vlan'))
+      have_access_vlan = str(have.get('access_vlan'))
+      if want_access_vlan != have_access_vlan:
+        cmd = 'switchport access vlan {0}'.format(want_access_vlan)
+        cmds.append(cmd)
+
+    if want_mode == 'trunk':
+      want_trunk_vlans = None if want.get('trunk_vlans') is None else str(want.get('trunk_vlans'))
+      have_trunk_vlans = str(have.get('trunk_vlans'))
+      want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
+      have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
+
+      # switchport trunk allowed vlan
+      # (1) want, have = none, 2-3     --> do nothing
+      # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
+      # (3) want, have = 2-3, 'ALL'    --> switchport trunk allowed vlan add 2-3
+      # (4) want, have = 2-3, 2        --> add and/or remove
+
+      if want_trunk_vlans is None:
+        # (1)
+        pass
+      elif want_trunk_list != have_trunk_list:
+        want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
+        have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
+        if want_trunk_vlans == 'ALL':
+          # (2)
+          cmds.append('no switchport trunk allowed vlan')
+        else:
+          if have_trunk_vlans == 'ALL':
+            # (3)
+            cmd = 'switchport trunk allowed vlan {0}'.format(want_trunk_vlans)
+            cmds.append(cmd)
+          else:
+            # (4)
+            vlans_to_add = set(want_trunk_list).difference(have_trunk_list)
+            if vlans_to_add:
+              vlans_to_add = self.vlan_list_to_str(vlans_to_add)
+              cmd = 'switchport trunk allowed vlan add {0}'.format(vlans_to_add)
+              cmds.append(cmd)
+            vlans_to_del = set(have_trunk_list).difference(want_trunk_list)
+            if vlans_to_del:
+              vlans_to_del = self.vlan_list_to_str(vlans_to_del)
+              cmd = 'switchport trunk allowed vlan remove {0}'.format(vlans_to_del)
+              cmds.append(cmd)
+
+      # switchport trunk native vlan
+      want_native_vlan = None if want.get('native_vlan') is None else str(want.get('native_vlan'))
+      have_native_vlan = str(have.get('native_vlan'))
+      if want_native_vlan is not None:
+        if want_native_vlan != have_native_vlan:
+          cmd = 'switchport trunk native vlan {0}'.format(want_native_vlan)
+          cmds.append(cmd)
+
+      # switchport nonegotiate
+      want_nonegotiate = want.get('nonegotiate')
+      have_nonegotiate = have.get('nonegotiate')
+      if want_nonegotiate is not None:
+        if want_nonegotiate is True and have_nonegotiate is False:
+          cmds.append('switchport nonegotiate')
+        elif want_nonegotiate is False and have_nonegotiate is True:
+          cmds.append('no switchport nonegotiate')
+
+    return cmds
+
+
+  def to_commands(self, want, have):
+
+    commands = []
+
+    intf_name = want.get('name')
+
+    # 'interface GigabitEthernet1'
+    interface = 'interface ' + intf_name
+    commands.append(interface)
+
+    state = want.get('state')
+
+    if state == 'present':
+      cmds = self.to_commands_present(want, have)
+      if cmds:
+        commands.extend(cmds)
+
+    if state == 'unconfigured':
+      cmds = self.to_commands_unconfigured(have)
+      if cmds:
+        commands.extend(cmds)
+
+    if state == 'absent':
+      cmds = self.to_commands_absent(want, have)
+      if cmds:
+        commands.extend(cmds)
+
+    if commands[-1] == interface:
+      commands.pop(-1)
+
+    return commands
+
+
+  def to_commands_list(self, want_list, have_list):
+    commands = []
+
+    for want in want_list:
+      name = want.get('name')
+      have = self.search_obj_in_list(name, have_list)
+      # 対象となるインタフェースが存在するときだけ実行
+      if have:
+        cmds = self.to_commands(want, have)
+        commands.extend(cmds)
+
+    return commands
+
+
+  @staticmethod
+  def validate(want, have, vlan_list):
+
+    # wantのパラメータがおかしくないかチェックする
+    mode = want.get('mode')
+    access_vlan = want.get('access_vlan')  # this is int
+    native_vlan = want.get('native_vlan')  # this is int
+
+    if mode == 'access' and not access_vlan:
+      return 'access_vlan param is required when mode access.'
+
+    if mode == 'trunk' and access_vlan:
+      return 'access_vlan is not supported when mode trunk'
+
+    # haveのパラメータと比較しておかしくないかチェックする
+    switchport = have.get('switchport')
+    if switchport != 'Enabled':
+      return 'interface must be configured as switchport first.'
+
+    channel_group = have.get('channel_group')
+    if channel_group:
+      return 'Can not change physical port because it is a port-channel member.'
+
+    # vlan_listと比較しておかしくないかチェックする
+    if access_vlan and access_vlan not in vlan_list:
+      return 'You are trying to configure a access vlan on an interface that does not exist on the switch yet.'
+    elif native_vlan and native_vlan not in vlan_list:
+      return 'You are trying to configure a native vlan on an interface that does not exist on the switch yet.'
+
+
+  def validate_list(self, want_list, have_list, vlan_list):
+    if not have_list:
+      return 'failed to investigate existing interfaces.'
+
+    for want in want_list:
+      state = want.get('state')
+      # presentのときのみ検証する
+      if state != 'present':
+        continue
+
+      name = want.get('name')
+      have = self.search_obj_in_list(name, have_list)
+      if have:
+        msg = self.validate(want, have, vlan_list)
+        if msg:
+          return msg
+
+
+  def _handle_template(self, key_path):
+    # pylint: disable=W0212
+    if not self._task.args.get(key_path):
+      return
+
+    src = self._task.args.get(key_path)
+
+    working_path = self._loader.get_basedir()
+    if self._task._role is not None:
+      working_path = self._task._role._role_path
+
+    if os.path.isabs(src) or urlsplit('src').scheme:
+      source = src
+    else:
+      source = self._loader.path_dwim_relative(working_path, 'templates', src)
+      if not source:
+        source = self._loader.path_dwim_relative(working_path, src)
+
+    if not os.path.exists(source):
+      raise ValueError('path specified in src not found')
+
+    try:
+      with open(source, 'r') as f:
+        template_data = to_text(f.read())
+    except IOError:
+      return dict(failed=True, msg='unable to load file, {}'.format(src))
+
+    # Create a template search path in the following order:
+    # [working_path, self_role_path, dependent_role_paths, dirname(source)]
+    searchpath = [working_path]
+    if self._task._role is not None:
+      searchpath.append(self._task._role._role_path)
+      if hasattr(self._task, "_block:"):
+        dep_chain = self._task._block.get_dep_chain()
+        if dep_chain is not None:
+          for role in dep_chain:
+            searchpath.append(role._role_path)
+    searchpath.append(os.path.dirname(source))
+    self._templar.environment.loader.searchpath = searchpath
+    self._task.args[key_path] = self._templar.template(template_data)
+
+
+  def run(self, tmp=None, task_vars=None):
+    del tmp  # tmp no longer has any effect
+
+    # ファイルへのパスを指定されていたらファイルの中身に展開する
+    try:
+      self._handle_template('running_config_path')
+      self._handle_template('show_vlan_path')
+      self._handle_template('show_interfaces_switchport_path')
+    except ValueError as e:
+      return dict(failed=True, msg=to_text(e))
+
+    # モジュールを実行する
+    # ただし、このモジュールは何もしない
+    result = super(ActionModule, self).run(task_vars=task_vars)
+
+    #
+    # モジュール実行後の後工程処理
+    #
+
+    # モジュールに渡されたパラメータ情報をオブジェクトにする
+    want_list = self.map_params_to_obj()
+    if self._task.args.get('debug'):
+      result['want'] = want_list
+
+    # コンフィグ情報をオブジェクトにしてhave_listにする
+    if self._task.args.get('running_config_path'):
+      config = self._task.args.get('running_config_path')
+    else:
+      config = self._task.args.get('running_config')
+
+    have_list = self.map_config_to_obj(config)
+
+    # show interfaces switchportの出力をオブジェクトにしてswitchport_listにする
+    if self._task.args.get('show_interfaces_switchport_path'):
+      show_interfaces_switchport = self._task.args.get('show_interfaces_switchport_path')
+    else:
+      show_interfaces_switchport = self._task.args.get('show_interfaces_switchport')
+
+    switchport_list = self.map_show_interfaces_switchport_to_obj(show_interfaces_switchport)
+
+    # switchport_listの情報をhave_listに追加する
+    for item in have_list:
+      o = self.search_obj_in_list(item['name'], switchport_list)
+      if o:
+        item.update(o)
+
+    if self._task.args.get('debug'):
+      result['have'] = have_list
+
+    # show vlan briefの情報をオブジェクトにしてvlan_listにする
+    if self._task.args.get('show_vlan_path'):
+      show_vlan = self._task.args.get('show_vlan_path')
+    else:
+      show_vlan = self._task.args.get('show_vlan')
+
+    vlan_list = self.map_show_vlan_to_obj(show_vlan)
+    if self._task.args.get('debug'):
+      result['vlan_list'] = vlan_list
+
+    #
+    # ここまでの処理でhave_list, want_list, vlan_listが出揃った
+    #
+
+    #
+    # 入力条件がおかしくないかチェック
+    #
+
+    msg = self.validate_list(want_list, have_list, vlan_list)
+    if msg:
+      result['msg'] = msg
+      result['failed'] = True
+
+    #
+    # 差分のコンフィグを作成する
+    #
+
+    commands = self.to_commands_list(want_list, have_list)
+    result['commands'] = commands
+
+    return result

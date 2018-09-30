@@ -1,0 +1,10 @@
+---
+
+- import_playbook: playbooks/hsrp.yml
+- import_playbook: playbooks/interface.yml
+- import_playbook: playbooks/interface_address.yml
+- import_playbook: playbooks/interface_trunk.yml
+- import_playbook: playbooks/ip_access_list.yml
+- import_playbook: playbooks/linkagg.yml
+- import_playbook: playbooks/static_route.yml
+- import_playbook: playbooks/vlan.yml

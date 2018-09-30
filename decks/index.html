@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>reveal.jsの練習</title>
+
+  <link ref="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/reveal.css">
+  <!-- <link rel="stylesheet" href="css/reveal.css"> -->
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/theme/white.css">
+  <!-- <link rel="stylesheet" href="css/theme/black.css"> -->
+
+  <!-- Theme used for syntax highlighting of code -->
+  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/lib/css/zenburn.css"> -->
+  <!-- <link rel="stylesheet" href="lib/css/zenburn.css"> -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.6.0/themes/prism.min.css">
+
+
+  <!-- Printing and PDF exports -->
+  <script>
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    // link.href = window.location.search.match(/print-pdf/gi) ? 'css/print/pdf.css' : 'css/print/paper.css';
+    link.href = window.location.search.match(/print-pdf/gi) ? 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/print/pdf.css' : 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/print/paper.css';
+    document.getElementsByTagName('head')[0].appendChild(link);
+  </script>
+</head>
+
+<body>
+
+  <div class="reveal">
+    <div class="slides">
+
+      <section data-markdown="" data-separator="^\n---$" data-separator-vertical="^\n>>>$" data-separator-notes="^Note:" data-charset="utf-8">
+        <textarea data-template>
+
+## markdown でプレゼン
+
+あ
+
+---
+### ページ１
+- - -
+上の破線のようなものは水平線
+こんな感じでガシガシ書いていきます
+
+**次は２ページ目**
+
+<aside class="notes">
+  発表者が見るノート
+  伝えたいことをメモ
+</aside>
+
+
+---
+### ページ２
+
+- - -
+1. 数字付きのリスト
+1. 番号はどうでもいい
+
+>>>
+### ページ２−１
+ページ２から垂直に下に遷移する
+垂直遷移には補助的な説明を
+
+- 普通のリスト
+- 簡潔にね
+
+>>>
+### ページ２−２
+どんどん書いていく
+
+
+
+        </textarea>
+
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/lib/js/head.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/js/reveal.js"></script>
+
+  <!--
+  <script src="lib/js/head.min.js"></script>
+  <script src="js/reveal.js"></script>
+  -->
+
+  <script>
+    // More info about config & dependencies:
+    // - https://github.com/hakimel/reveal.js#configuration
+    // - https://github.com/hakimel/reveal.js#dependencies
+    Reveal.initialize({
+      dependencies: [
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/markdown/marked.js' },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/markdown/markdown.js' },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/notes/notes.js', async: true },
+        { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/plugin/highlight/highlight.js',
+          async: true,
+          callback: function () { hljs.initHighlightingOnLoad(); }
+        }
+      ],
+
+      // Display presentation control arrows
+      controls: true,
+
+      // Push each slide change to the browser history
+      history: false,
+
+      // Display the page number of the current slide
+      slideNumber: false,
+
+      // Enable keyboard shortcuts for navigation
+      keyboard: true,
+
+      // Vertical centering of slides
+      center: false,
+
+      // Enables touch navigation on devices with touch input
+      touch: true,
+
+      // Enable slide navigation via mouse wheel
+      mouseWheel: false,
+
+      // Hides the address bar on mobile devices
+      hideAddressBar: false,
+
+      // Transition style
+      transition: 'fade', // none/fade/slide/convex/concave/zoom
+
+      // Transition speed
+      transitionSpeed: 'default', // default/fast/slow
+
+      // Transition style for full page slide backgrounds
+      backgroundTransition: 'fade', // none/fade/slide/convex/concave/zoom
+
+      // Parallax background image
+      parallaxBackgroundImage: '', // e.g. "'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg'"
+
+      // Parallax background size
+      parallaxBackgroundSize: '', // CSS syntax, e.g. "2100px 900px"
+
+      // Number of pixels to move the parallax background per slide
+      // - Calculated automatically unless specified
+      // - Set to 0 to disable movement along an axis
+      parallaxBackgroundHorizontal: null,
+      parallaxBackgroundVertical: null,
+
+      // The display mode that will be used to show slides
+      display: 'block'
+
+    });
+  </script>
+
+</body>
+
+</html>
