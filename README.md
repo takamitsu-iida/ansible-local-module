@@ -184,3 +184,9 @@ ios_configモジュールは親子関係を指定する必要があるため少�
     - commands
   register: r
 ```
+
+<br>
+
+# reveal.jsの練習
+
+[decks](decks/index.html)
