@@ -8,11 +8,19 @@
 
 Note: TODO - check on branding/lettering
 
+
+
 ---
+
+
 
 # According to Gartner
 
+
+
 ---
+
+
 
 # Automation considerations
 
@@ -23,9 +31,13 @@ Note: TODO - check on branding/lettering
 
 Note: TODO - Transition slide from problem to solution.
 
+
+
 ---
 
-# What is Ansible?
+
+
+# What is Ansible
 
 Red Hat Ansible network automation is enterprise software for automating and managing IT infrastructure.
 
