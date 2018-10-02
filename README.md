@@ -87,6 +87,47 @@ action_plugins = ./plugins/action
 stdout_callback = debug
 ```
 
+## プレイブックの例
+
+事前に採取済みの情報を使って差分コマンドを生成するなら、localhostをターゲットに実行します。
+簡単なものであれば以下のようにvarsにパラメータを直書きしてもいいでしょう。
+
+```yaml
+- name: playbook for module test
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+
+    - name: create config to be pushed
+      ios_interface_local:
+        running_config: "{{ running_config }}"
+        interfaces: "{{ interfaces }}"
+        debug: true
+      register: r
+      vars:
+        running_config: |
+        !
+        interface GigabitEthernet3
+         description configured by hand
+        !
+
+        interfaces:
+          - name: GigabitEthernet3
+            description: configured by ansible
+            state: present
+
+    - name: TEST 1
+      debug:
+        var: r
+```
+
+稼働中の装置から(ios_commandモジュール等を使って)情報を採取する場合、
+プレイブックのhostsはその装置になります。
+ローカルモジュールに対しては`delegate_to: localhost`をつけてください。
+つけなくても動きますが、意味のない接続が発生します。
+
 <br>
 
 # Cisco IOS系ローカルモジュール
@@ -218,6 +259,8 @@ ios_configモジュールは親子関係を指定する必要があるため少�
 <br>
 <br>
 
-# reveal.jsの個人的練習
+## Presentation Decks
 
-[decks](https://takamitsu-iida.github.io/ansible-local-module/decks/index.html)
+reveal.jsの練習用
+
+- [ローカルモジュールとは](https://takamitsu-iida.github.io/ansible-local-module/decks/index.html)
