@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD037 -->
+<!-- markdownlint-disable MD012 -->
 
 # Ansibleローカルモジュール
 
