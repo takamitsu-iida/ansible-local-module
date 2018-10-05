@@ -225,18 +225,38 @@ class ActionModule(_ActionModule):
 
       # show interface switchportの出力ではインタフェース名が省略語になっているので変換する
       # Gi0/1 -> GigabitEthernet0/1
-      name = re.search(r'Name: (.*)$', section, re.M).group(1)
-      name = self.normalize_interafce_name(name)
+      m = re.search(r'Name: (.*)$', section, re.M)
+      if m:
+        name = m.group(1)
+        name = self.normalize_interafce_name(name)
+      else:
+        continue
 
-      mode = re.search(r'Administrative Mode: (?:.* )?(\w+)$', section, re.M).group(1)
-      switchport = re.search(r'Switchport: (\S+)$', section, re.M).group(1)
-      access = re.search(r'Access Mode VLAN: (\d+)', section).group(1)
-      native = re.search(r'Trunking Native Mode VLAN: (\d+)', section).group(1)
-      trunk = re.search(r'Trunking VLANs Enabled: (.+)$', section, re.M).group(1)
+      m = re.search(r'Administrative Mode: (?:.* )?(\w+)$', section, re.M)
+      if m:
+        mode = m.group(1)
+
+      m = re.search(r'Switchport: (\S+)$', section, re.M)
+      if m:
+        switchport = m.group(1)
+
+      m = re.search(r'Access Mode VLAN: (\d+)', section)
+      if m:
+        access = m.group(1)
+
+      m = re.search(r'Trunking Native Mode VLAN: (\d+)', section)
+      if m:
+        native = m.group(1)
+
+      m = re.search(r'Trunking VLANs Enabled: (.+)$', section, re.M)
+      if m:
+        trunk = m.group(1)
 
       # negotiationはboolに変換
-      negotiation = re.search(r'Negotiation of Trunking: (\S+)$', section, re.M).group(1)
-      nonegotiate = bool(negotiation == 'Off')
+      m = re.search(r'Negotiation of Trunking: (\S+)$', section, re.M)
+      if m:
+        negotiation = m.group(1)
+        nonegotiate = bool(negotiation == 'Off')
 
       results.append({
         'name': name,
@@ -262,15 +282,12 @@ class ActionModule(_ActionModule):
 
 
   def map_config_to_obj(self, config):
+    results = []
 
     # ほとんどの情報はshow interfaces switchportから読み取るので、
     # running-configはチャネルが設定されているかどうか、しか見ない
 
-    results = []
-
     match = re.findall(r'^interface (\S+)', config, re.M)
-    if not match:
-      return results
 
     configobj = NetworkConfig(indent=1, contents=config)
 
@@ -666,6 +683,9 @@ class ActionModule(_ActionModule):
     else:
       config = self._task.args.get('running_config')
 
+    if not config:
+      return dict(failed=True, msg="running_config is required but not set")
+
     have_list = self.map_config_to_obj(config)
 
     # show interfaces switchportの出力をオブジェクトにしてswitchport_listにする
@@ -673,6 +693,9 @@ class ActionModule(_ActionModule):
       show_interfaces_switchport = self._task.args.get('show_interfaces_switchport_path')
     else:
       show_interfaces_switchport = self._task.args.get('show_interfaces_switchport')
+
+    if not show_interfaces_switchport:
+      return dict(failed=True, msg="show_interfaces_switchport is required but not set")
 
     switchport_list = self.map_show_interfaces_switchport_to_obj(show_interfaces_switchport)
 
