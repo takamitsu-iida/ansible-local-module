@@ -74,13 +74,14 @@ class ActionModule(_ActionModule):
 
 
   @staticmethod
-  def normalize_interafce_name(name):
+  def normalize_interface_name(name):
     match = re.search(r'Gi(\d.*)', name)
     if match:
-      name = 'GigabitEthernet' + match.group(1)
+      name = 'GigabitEthernet{}'.format(match.group(1))
+
     match = re.search(r'Fa(\d.*)', name)
     if match:
-      name = 'FastEthernet' + match.group(1)
+      name = 'FastEthernet{}'.format(match.group(1))
     return name
 
 
@@ -218,6 +219,9 @@ class ActionModule(_ActionModule):
 
 
   def map_show_interfaces_switchport_to_obj(self, show_interfaces_switchport):
+    if not show_interfaces_switchport:
+      return list()
+
     results = []
 
     sections = self.parse_show_interfaces_switchport(show_interfaces_switchport)
@@ -228,7 +232,7 @@ class ActionModule(_ActionModule):
       m = re.search(r'Name: (.*)$', section, re.M)
       if m:
         name = m.group(1)
-        name = self.normalize_interafce_name(name)
+        name = self.normalize_interface_name(name)
       else:
         continue
 
@@ -701,7 +705,7 @@ class ActionModule(_ActionModule):
 
     # switchport_listの情報をhave_listに追加する
     for item in have_list:
-      o = self.search_obj_in_list(item['name'], switchport_list)
+      o = self.search_obj_in_list(item.get('name'), switchport_list)
       if o:
         item.update(o)
 
