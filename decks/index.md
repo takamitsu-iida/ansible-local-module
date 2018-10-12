@@ -41,6 +41,25 @@ Takamitsu IIDA (@takamitsu-iida)
 
 ---
 
+## ネットワーク機器の設定
+
+ある意味、特殊な文化
+
+- デフォルトの設定は表示されない
+- noを付けると設定が消える（デフォルトの状態に戻る）
+
+---
+
+## 一方でAnsibleの文化は
+
+- state: present　-> その状態がある
+- state: absent -> その状態が存在しない
+- 同時には指定できない
+
+あるパラメータはデフォルトのままが正、あるパラメータは値を変更する、というのを表現したい
+
+---
+
 ## こうあってほしい
 
 ![ローカルモジュール](img/fig2.png)
@@ -97,12 +116,29 @@ interfaces:
 
   - name: GigabitEthernet3
     description: configured by ansible
-    negotiation:
-    speed:
     mtu: 1500
     shutdown: false
     state: present
 ```
+
+---
+
+## モジュールへの入力（３）
+
+### デフォルト状態をpresentで表現
+
+- 値を持たないキーはデフォルトの状態であることを意味する
+
+```yaml
+interfaces:
+
+  - name: GigabitEthernet3
+    speed:
+    mtu:
+    state: present
+```
+
+mtuやspeedは装置に設定が入っていればnoで消された状態になる
 
 ---
 

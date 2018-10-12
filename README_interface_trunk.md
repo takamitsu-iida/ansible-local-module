@@ -44,7 +44,8 @@ show vlanの出力も必要です。
 
 - **mode** インタフェースのモードをaccessかtrunkで指定します
 - **access_vlan** VLAN IDを数値で指定します(1-4094)
-- **trunk_range** allowed vlanに含めるVLANを'-'と','で指定します
+- **trunk_vlan** allowed vlanに含めるVLANを'-'と','で指定します
+- **native_vlan** native vlanを指定します(1-4094)
 - **state** インタフェースにおけるVLANの状態を[ 'present' | 'absent' | 'unconfigured' ]で指定します
 
 <br>
