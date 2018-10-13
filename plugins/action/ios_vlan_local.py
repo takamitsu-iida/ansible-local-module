@@ -161,8 +161,11 @@ class ActionModule(_ActionModule):
 
   def args_to_obj(self, args):
     obj = {}
+
     for p in self.supported_params:
-      obj[p] = args.get(p)
+      # そのパラメータが入力したYAMLにある場合だけwantに取り込む
+      if p in args:
+        obj[p] = args.get(p)
 
     # stateは設定されていない場合'present'の扱いにする
     obj['state'] = args.get('state', 'present')

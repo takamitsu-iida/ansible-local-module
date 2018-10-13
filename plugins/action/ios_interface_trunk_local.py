@@ -46,6 +46,26 @@ class ActionModule(_ActionModule):
 
 
   @staticmethod
+  def get_value(want, key, none_is='', converter=str):
+    if want is None:
+      return None
+
+    # キーがなければNone
+    if key not in want:
+      return None
+
+    # キーはあるものの値がない場合は空白文字''を返却
+    if want.get(key) is None:
+      return none_is
+
+    # デフォルトではstrに変換
+    if converter:
+      return converter(want.get(key))
+
+    return want.get(key)
+
+
+  @staticmethod
   def search_obj_in_list(name, lst):
     for o in lst:
       if o['name'] == name:
@@ -314,7 +334,11 @@ class ActionModule(_ActionModule):
     for p in self.supported_params:
       # そのパラメータが入力したYAMLにある場合だけwantに取り込む
       if p in args:
-        obj[p] = args.get(p)
+        v = args.get(p)
+        # 空指定は''に置き換える
+        if v is None:
+          v = ''
+        obj[p] = v
 
     # stateは設定されていない場合'present'の扱いにする
     obj['state'] = args.get('state', 'present')
@@ -378,62 +402,82 @@ class ActionModule(_ActionModule):
 
     want_mode = want.get('mode')
 
-    if want_mode == 'access':
+    # mode
+    want_mode = self.get_value(want, 'mode')
+    have_mode = self.get_value(have, 'mode')
+    if want_mode is None:
+      pass
+    else:
+      # デフォルトのモードはaccessなので、それ以外なら消す
+      if have_mode != 'access':
+        cmds.append('no switchport mode')
+
+    # access_vlan
+    want_access_vlan = self.get_value(want, 'access_vlan')
+    have_access_vlan = self.get_value(have, 'access_vlan')
+    if want_access_vlan is None:
+      pass
+    else:
       # 指定されたaccess vlanが存在しない(absentの)状態にする -> デフォルトの状態にする
-      have_access_vlan = str(have.get('access_vlan'))
       if have_access_vlan != '1':
         cmds.append('no switchport access vlan')
 
-    elif want_mode == 'trunk':
+    # trunk_vlans
+    want_trunk_vlans = self.get_value(want, 'trunk_vlans')
+    have_trunk_vlans = self.get_value(have, 'trunk_vlans')
+    want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
+    have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
 
-      want_trunk_vlans = None if want.get('trunk_vlans') is None else str(want.get('trunk_vlans'))
-      have_trunk_vlans = str(have.get('trunk_vlans'))
-      want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
-      have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
+    # (0) want, have = None, 2-3     --> do nothing
+    # (1) want, have = '', 2-3       --> no switchport trunk allowed vlan
+    # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
+    # (3) want, have = 2-3, 2-3      --> no switchport trunk allowed vlan
+    # (4) want, have = 2,3, 2,3,4,5  --> switchport trunk allowed vlan remove 2-3
 
-      # (1) want, have = none, 2-3     --> do nothing
-      # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
-      # (3) want, have = 2-3, 'ALL'    --> switchport trunk allowed vlan remove 2-3
-      # (4) want, have = 2,3, 2,3,4,5  --> switchport trunk allowed vlan remove 2-3
-
-      if want_trunk_vlans is None:
+    if want_trunk_vlans is None:
+      # (0)
+      pass
+    elif want_trunk_vlans == '':
+      if have_trunk_vlans != 'ALL':
         # (1)
-        pass
-      elif want_trunk_list != have_trunk_list:
+        cmds.append('no switchport trunk allowed vlan')
+    elif want_trunk_vlans == 'ALL':
+      if have_trunk_vlans != 'ALL':
+        # (2)
+        cmds.append('no switchport trunk allowed vlan')
+    elif want_trunk_vlans == have_trunk_vlans:
+      # (3)
+      cmds.append('no switchport trunk allowed vlan')
+    else:
+      # (4)
+      vlans_to_del = set(want_trunk_list).intersection(have_trunk_list)
+      if vlans_to_del:
+        vlans_to_del = self.vlan_list_to_str(vlans_to_del)
+        cmd = 'switchport trunk allowed vlan remove {0}'.format(vlans_to_del)
+        cmds.append(cmd)
 
-        if want_trunk_vlans == 'ALL':
-          # (2)
-          cmds.append('no switchport trunk allowed vlan')
-        else:
-          if have_trunk_vlans == 'ALL':
-            # (3)
-            cmd = 'switchport trunk allowed vlan remove {0}'.format(want_trunk_vlans)
-            cmds.append(cmd)
-          else:
-            # (4)
-            vlans_to_del = set(want_trunk_list).intersection(have_trunk_list)
-            if vlans_to_del:
-              vlans_to_del = self.vlan_list_to_str(vlans_to_del)
-              cmd = 'switchport trunk allowed vlan remove {0}'.format(vlans_to_del)
-              cmds.append(cmd)
+    # no switchport trunk native vlan
+    # native vlanをabsentする、すなわちデフォルトに戻す。数字は何を指定しても同じ。
+    want_native_vlan = self.get_value(want, 'native_vlan')
+    have_native_vlan = self.get_value(have, 'native_vlan')
+    if want_native_vlan is None:
+      pass
+    else:
+      if have_native_vlan != '1':
+        cmds.append('no switchport trunk native vlan')
 
-      # no switchport trunk native vlan
-      # native vlanをabsentする、すなわちデフォルトに戻す。数字は何を指定しても同じ。
-      want_native_vlan = None if want.get('native_vlan') is None else str(want.get('native_vlan'))
-      have_native_vlan = have.get('native_vlan')
-      if want_native_vlan is not None:
-        if have_native_vlan != '1':
-          cmds.append('no switchport trunk native vlan')
-
-      # no switchport nonegotiate
-      # absentなので、switchport nonegotiateが設置されていないのが正しい状態
-      want_nonegotiate = None if want.get('nonegotiate') is None else want.get('nonegotiate')
-      have_nonegotiate = have.get('nonegotiate')
-      if want_nonegotiate is not None:
-        if want_nonegotiate == have_nonegotiate and want_nonegotiate is True:
-          cmds.append('no switchport nonegotiate')
-        elif want_nonegotiate == have_nonegotiate and want_nonegotiate is False:
-          cmds.append('switchport nonegotiate')
+    # no switchport nonegotiate
+    # absentなので、switchport nonegotiateが設置されていないのが正しい状態
+    want_nonegotiate = self.get_value(want, 'nonegotiate', none_is=False, converter=bool)
+    have_nonegotiate = self.get_value(have, 'nonegotiate', none_is=False, converter=bool)
+    if want_nonegotiate is None:
+      pass
+    elif want_nonegotiate is True:  # -> Falseにしたい
+      if have_nonegotiate is not False:
+        cmds.append('no switchport nonegotiate')
+    elif want_nonegotiate is False:  # -> Trueにしたい
+      if have_nonegotiate is not True:
+        cmds.append('switchport nonegotiate')
 
     return cmds
 
@@ -442,80 +486,98 @@ class ActionModule(_ActionModule):
 
     cmds = []
 
-    # switchport mode access
-    # switchport mode trunk
-    want_mode = want.get('mode')
-    have_mode = have.get('mode')
-    if want_mode != have_mode:
-      if want_mode == 'trunk':
+    #
+    # キーの値を空にした場合は、デフォルトの状態にしたいものとみなす
+    #
+
+    # switchport mode <access, trunk>
+    want_mode = self.get_value(want, 'mode')
+    have_mode = self.get_value(have, 'mode')
+
+    if want_mode is None:
+      pass
+    elif want_mode == '':
+      if have_mode != 'access':
+        cmds.append('no switchport mode')
+    elif want_mode == 'access':
+      if have_mode != 'access':
+        cmds.append('switchport mode access')
+    elif want_mode == 'trunk':
+      if have_mode != 'trunk':
         cmds.append('switchport trunk encapsulation dot1q')
         cmds.append('switchport mode trunk')
-      elif want_mode == 'access':
-        cmds.append('switchport mode access')
 
     # switchport access vlan
-    if want_mode == 'access':
-      want_access_vlan = str(want.get('access_vlan'))
-      have_access_vlan = str(have.get('access_vlan'))
-      if want_access_vlan != have_access_vlan:
-        cmd = 'switchport access vlan {0}'.format(want_access_vlan)
-        cmds.append(cmd)
+    want_access_vlan = self.get_value(want, 'access_vlan')
+    have_access_vlan = self.get_value(have, 'access_vlan')
+    if want_access_vlan is None:
+      pass
+    elif want_access_vlan == '':
+      if have_access_vlan != '1':
+        cmds.append('no switchport access vlan')
+    elif want_access_vlan != have_access_vlan:
+      cmds.append('switchport access vlan {0}'.format(want_access_vlan))
 
-    if want_mode == 'trunk':
-      want_trunk_vlans = None if want.get('trunk_vlans') is None else str(want.get('trunk_vlans'))
-      have_trunk_vlans = str(have.get('trunk_vlans'))
-      want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
-      have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
+    # switchport trunk allowed vlan
+    want_trunk_vlans = self.get_value(want, 'trunk_vlans')
+    have_trunk_vlans = self.get_value(have, 'trunk_vlans')
+    want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
+    have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
 
-      # switchport trunk allowed vlan
-      # (1) want, have = none, 2-3     --> do nothing
-      # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
-      # (3) want, have = 2-3, 'ALL'    --> switchport trunk allowed vlan add 2-3
-      # (4) want, have = 2-3, 2        --> add and/or remove
+    # (0) want, have = None, 2-3     --> do nothing
+    # (1) want, have = '', 2-3       --> no switchport trunk allowed vlan
+    # (2) want, have = 'ALL', 2-3    --> no switchport trunk allowed vlan
+    # (3) want, have = 2-3, 'ALL'    --> switchport trunk allowed vlan add 2-3
+    # (4) want, have = 2-3, 2        --> add and/or remove
 
-      if want_trunk_vlans is None:
-        # (1)
-        pass
-      elif want_trunk_list != have_trunk_list:
-        want_trunk_list = self.vlan_str_to_list(want_trunk_vlans)
-        have_trunk_list = self.vlan_str_to_list(have_trunk_vlans)
-        if want_trunk_vlans == 'ALL':
-          # (2)
-          cmds.append('no switchport trunk allowed vlan')
+    if want_trunk_vlans is None:
+      # (0)
+      pass
+    elif want_trunk_vlans == '':
+      # (1)
+      if have_trunk_vlans != 'ALL':
+        cmds.append('no switchport trunk allowed vlan')
+    elif want_trunk_list != have_trunk_list:
+      if want_trunk_vlans == 'ALL':
+        # (2)
+        cmds.append('no switchport trunk allowed vlan')
+      else:
+        if have_trunk_vlans == 'ALL':
+          # (3)
+          cmds.append('switchport trunk allowed vlan {0}'.format(want_trunk_vlans))
         else:
-          if have_trunk_vlans == 'ALL':
-            # (3)
-            cmd = 'switchport trunk allowed vlan {0}'.format(want_trunk_vlans)
-            cmds.append(cmd)
-          else:
-            # (4)
-            vlans_to_add = set(want_trunk_list).difference(have_trunk_list)
-            if vlans_to_add:
-              vlans_to_add = self.vlan_list_to_str(vlans_to_add)
-              cmd = 'switchport trunk allowed vlan add {0}'.format(vlans_to_add)
-              cmds.append(cmd)
-            vlans_to_del = set(have_trunk_list).difference(want_trunk_list)
-            if vlans_to_del:
-              vlans_to_del = self.vlan_list_to_str(vlans_to_del)
-              cmd = 'switchport trunk allowed vlan remove {0}'.format(vlans_to_del)
-              cmds.append(cmd)
+          # (4)
+          vlans_to_add = set(want_trunk_list).difference(have_trunk_list)
+          if vlans_to_add:
+            vlans_to_add = self.vlan_list_to_str(vlans_to_add)
+            cmds.append('switchport trunk allowed vlan add {0}'.format(vlans_to_add))
+          vlans_to_del = set(have_trunk_list).difference(want_trunk_list)
+          if vlans_to_del:
+            vlans_to_del = self.vlan_list_to_str(vlans_to_del)
+            cmds.append('switchport trunk allowed vlan remove {0}'.format(vlans_to_del))
 
-      # switchport trunk native vlan
-      want_native_vlan = None if want.get('native_vlan') is None else str(want.get('native_vlan'))
-      have_native_vlan = str(have.get('native_vlan'))
-      if want_native_vlan is not None:
-        if want_native_vlan != have_native_vlan:
-          cmd = 'switchport trunk native vlan {0}'.format(want_native_vlan)
-          cmds.append(cmd)
+    # switchport trunk native vlan
+    want_native_vlan = self.get_value(want, 'native_vlan')
+    have_native_vlan = self.get_value(have, 'native_vlan')
+    if want_native_vlan is None:
+      pass
+    elif want_native_vlan == '':
+      if have_native_vlan != '1':
+        cmds.append('no switchport trunk native vlan')
+    elif want_native_vlan != have_native_vlan:
+      cmds.append('switchport trunk native vlan {0}'.format(want_native_vlan))
 
-      # switchport nonegotiate
-      want_nonegotiate = want.get('nonegotiate')
-      have_nonegotiate = have.get('nonegotiate')
-      if want_nonegotiate is not None:
-        if want_nonegotiate is True and have_nonegotiate is False:
-          cmds.append('switchport nonegotiate')
-        elif want_nonegotiate is False and have_nonegotiate is True:
-          cmds.append('no switchport nonegotiate')
+    # switchport nonegotiate
+    want_nonegotiate = self.get_value(want, 'nonegotiate', none_is=False, converter=bool)
+    have_nonegotiate = self.get_value(have, 'nonegotiate', none_is=False, converter=bool)
+    if want_nonegotiate is None:
+      pass
+    elif want_nonegotiate is True:  # -> Trueにしたい
+      if have_nonegotiate is not True:
+        cmds.append('switchport nonegotiate')
+    elif want_nonegotiate is False:  # -> Falseにしたい
+      if have_nonegotiate is not False:
+        cmds.append('no switchport nonegotiate')
 
     return cmds
 
@@ -570,16 +632,17 @@ class ActionModule(_ActionModule):
   @staticmethod
   def validate(want, have, vlan_list):
 
-    # wantのパラメータがおかしくないかチェックする
+    # 1-4094はALLに置き換える
+    trunk_vlans = want.get('trunk_vlans')
+    if trunk_vlans == '1-4094':
+      want['trunk_vlans'] = 'ALL'
+
+    # modeがおかしくないかチェックする
     mode = want.get('mode')
-    access_vlan = want.get('access_vlan')  # this is int
-    native_vlan = want.get('native_vlan')  # this is int
-
-    if mode == 'access' and not access_vlan:
-      return 'access_vlan param is required when mode access.'
-
-    if mode == 'trunk' and access_vlan:
-      return 'access_vlan is not supported when mode trunk'
+    if mode is None or mode == 'access' or mode == 'trunk':
+      pass
+    else:
+      return 'mode is supported only access or trunk. {}'.format(to_text(mode))
 
     # haveのパラメータと比較しておかしくないかチェックする
     switchport = have.get('switchport')
@@ -591,6 +654,8 @@ class ActionModule(_ActionModule):
       return 'Can not change physical port because it is a port-channel member.'
 
     # vlan_listと比較しておかしくないかチェックする
+    access_vlan = want.get('access_vlan')  # this is int
+    native_vlan = want.get('native_vlan')  # this is int
     if access_vlan and access_vlan not in vlan_list:
       return 'You are trying to configure a access vlan on an interface that does not exist on the switch yet.'
     elif native_vlan and native_vlan not in vlan_list:
