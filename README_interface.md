@@ -30,16 +30,12 @@
 ### インタフェース設定パラメータ
 
 - **name** インタフェース名のフルネーム（略記不可）
-- **group** HSRPグループ番号
-- **priority** HSRPプライオリティ値（デフォルト100）
-- **vip** HSRP仮想IP
-- **secondary** セカンダリHSRP仮想IP（リスト）
-- **preempt** preempt（['enabled', 'disabled']）
-- **delay_minimum** standby 1 preempt delay minimum 60
-- **delay_reload** standby 1 preempt delay reload 120
-- **delay_sync**  standby 1 preempt delay sync 30
-- **auth_type** 認証タイプ（['text', 'md5']）
-- **auth_string** 認証文字列
+- **description** descriptionコマンド
+- **negotiation** negotiationコマンド
+- **speed** speed設定
+- **duplex** duplex設定(CSR1000vは未サポート)
+- **mtu** mtu設定(機器によってサポートされる値が違う)
+- **shutdown** shutdown設定
 
 <br>
 
@@ -196,5 +192,5 @@ ok: [localhost] => {
             "interface Loopback0",
             "description configured by ansible",
             "shutdown"
-        ]
+        ],
 ```
