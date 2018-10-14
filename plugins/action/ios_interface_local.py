@@ -52,6 +52,44 @@ class ActionModule(_ActionModule):
   ]
 
 
+  @staticmethod
+  def search_obj_in_list(name, lst):
+    for o in lst:
+      if o['name'] == name:
+        return o
+    return None
+
+
+  @staticmethod
+  def normalize_name(name):
+
+    intf_map = {
+      'E': 'Ethernet',
+      'F': 'FastEthernet',
+      'G': 'GigabitEthernet',
+      'TE': 'TenGigabitEthernet',
+      'TU': 'Tunnel',
+      'MG': 'Mgmt',
+      'L': 'Loopback',
+      'P': 'Port-channel',
+      'V': 'Vlan',
+      'S': 'Serial'
+    }
+
+    # nameが省略表記の場合はフルネームに置き換える
+    if name:
+      match = re.match(r'^(?P<intfname>[A-Za-z-]+)(\s+)?(?P<intfnum>\d+.*)', name)
+      if match:
+        intfname = match.group('intfname')
+        intfnum = match.group('intfnum')
+
+        for k, v in intf_map.items():
+          if intfname.upper().startswith(k):
+            return '{}{}'.format(v, intfnum)
+
+    return name
+
+
   def is_logical_interface(self, intf_name):
     logical_interface_list = ['loopback', 'tunnel']
     for name in logical_interface_list:
@@ -116,6 +154,14 @@ class ActionModule(_ActionModule):
 
   def validate(self, want_list):
     for want in want_list:
+
+      # nameが省略表記されていても大丈夫なように正規化する
+      name = want.get('name')
+      norm_name = self.normalize_name(name)
+      if norm_name != name:
+        want['name_input'] = name
+        want['name'] = norm_name
+
       # presentのときのみ検証する
       state = want.get('state')
       if state != 'present':
@@ -132,16 +178,7 @@ class ActionModule(_ActionModule):
             return msg
 
 
-  @staticmethod
-  def search_obj_in_list(name, lst):
-    for o in lst:
-      if o['name'] == name:
-        return o
-    return None
-
-
-  @staticmethod
-  def parse_config_argument(configobj, name, arg=None):
+  def parse_config_argument(self, configobj, name, arg=None):
 
     # nameで指定したインタフェース配下のコンフィグを取り出す
     parent = 'interface {}'.format(name)

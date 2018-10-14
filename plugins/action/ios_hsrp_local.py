@@ -77,12 +77,72 @@ class ActionModule(_ActionModule):
   }
 
 
-  def validate_name(self, want):
-    key = 'name'
+  @staticmethod
+  def force_numeric_string(want, key):
     value = want.get(key)
-    if not value:
+    if value is not None:
+      if not isinstance(value, str):
+        value = str(value)
+        want[key] = value
+      if not value.isnumeric():
+        return '{} must be number: {}'.format(key, value)
+
+
+  @staticmethod
+  def search_obj_in_list(want, have_list):
+    want_name = want.get('name')
+    want_group = want.get('group')
+    for have in have_list:
+      have_name = have.get('name')
+      have_group = have.get('group')
+      if want_name == have_name and want_group == have_group:
+        return have
+    return None
+
+
+  @staticmethod
+  def parse_argument(cfg, arg=None):
+    match = re.search(r'{} (.+)$'.format(arg), cfg, re.M)
+    if match:
+      return match.group(1)
+
+
+  @staticmethod
+  def normalize_name(name):
+
+    intf_map = {
+      'E': 'Ethernet',
+      'F': 'FastEthernet',
+      'G': 'GigabitEthernet',
+      'TE': 'TenGigabitEthernet',
+      'TU': 'Tunnel',
+      'MG': 'Mgmt',
+      'L': 'Loopback',
+      'P': 'Port-channel',
+      'V': 'Vlan',
+      'S': 'Serial'
+    }
+
+    # nameが省略表記の場合はフルネームに置き換える
+    if name:
+      match = re.match(r'^(?P<intfname>[A-Za-z-]+)(\s+)?(?P<intfnum>\d+.*)', name)
+      if match:
+        intfname = match.group('intfname')
+        intfnum = match.group('intfnum')
+
+        for k, v in intf_map.items():
+          if intfname.upper().startswith(k):
+            return '{}{}'.format(v, intfnum)
+
+    return name
+
+
+  def validate_name(self, want):
+    name = want.get('name')
+    if not name:
       return 'name is needed but not set.'
-    if value.lower().startswith('loop'):
+
+    if name.startswith('Loop'):
       return 'loopback interface does not support hsrp.'
 
 
@@ -180,12 +240,21 @@ class ActionModule(_ActionModule):
   def validate_track(self, want):
     return self.force_numeric_string(want, 'track')
 
+
   def validate_track_decrement(self, want):
     return self.force_numeric_string(want, 'track_decrement')
 
 
   def validate(self, want_list):
     for want in want_list:
+
+      # nameが省略表記されていても大丈夫なように正規化する
+      name = want.get('name')
+      norm_name = self.normalize_name(name)
+      if norm_name != name:
+        want['name_input'] = name
+        want['name'] = norm_name
+
       for key in want.keys():
         # to avoid pylint E1102
         # validator = getattr(self, 'validate_{}'.format(key), None)
@@ -194,36 +263,6 @@ class ActionModule(_ActionModule):
           msg = validator(want)
           if msg:
             return msg
-
-
-  @staticmethod
-  def force_numeric_string(want, key):
-    value = want.get(key)
-    if value is not None:
-      if not isinstance(value, str):
-        value = str(value)
-        want[key] = value
-      if not value.isnumeric():
-        return '{} must be number: {}'.format(key, value)
-
-
-  @staticmethod
-  def search_obj_in_list(want, have_list):
-    want_name = want.get('name')
-    want_group = want.get('group')
-    for have in have_list:
-      have_name = have.get('name')
-      have_group = have.get('group')
-      if want_name == have_name and want_group == have_group:
-        return have
-    return None
-
-
-  @staticmethod
-  def parse_argument(cfg, arg=None):
-    match = re.search(r'{} (.+)$'.format(arg), cfg, re.M)
-    if match:
-      return match.group(1)
 
 
   def standby_group_config_to_obj(self, group_config_list):

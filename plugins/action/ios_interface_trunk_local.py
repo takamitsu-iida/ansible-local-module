@@ -74,34 +74,32 @@ class ActionModule(_ActionModule):
 
 
   @staticmethod
-  def get_interface_type(name):
-    intf_type = 'unknown'
+  def normalize_name(name):
 
-    if name.upper()[:2] in ('ET', 'FA', 'GI'):
-      intf_type = 'ethernet'
-    elif name.upper().startswith('VL'):
-      intf_type = 'svi'
-    elif name.upper().startswith('LO'):
-      intf_type = 'loopback'
-    elif name.upper()[:2] in ('MG', 'MA'):
-      intf_type = 'management'
-    elif name.upper().startswith('PO'):
-      intf_type = 'portchannel'
-    elif name.upper().startswith('NV'):
-      intf_type = 'nve'
+    intf_map = {
+      'E': 'Ethernet',
+      'F': 'FastEthernet',
+      'G': 'GigabitEthernet',
+      'TE': 'TenGigabitEthernet',
+      'TU': 'Tunnel',
+      'MG': 'Mgmt',
+      'L': 'Loopback',
+      'P': 'Port-channel',
+      'V': 'Vlan',
+      'S': 'Serial'
+    }
 
-    return intf_type
+    # nameが省略表記の場合はフルネームに置き換える
+    if name:
+      match = re.match(r'^(?P<intfname>[A-Za-z-]+)(\s+)?(?P<intfnum>\d+.*)', name)
+      if match:
+        intfname = match.group('intfname')
+        intfnum = match.group('intfnum')
 
+        for k, v in intf_map.items():
+          if intfname.upper().startswith(k):
+            return '{}{}'.format(v, intfnum)
 
-  @staticmethod
-  def normalize_interface_name(name):
-    match = re.search(r'Gi(\d.*)', name)
-    if match:
-      name = 'GigabitEthernet{}'.format(match.group(1))
-
-    match = re.search(r'Fa(\d.*)', name)
-    if match:
-      name = 'FastEthernet{}'.format(match.group(1))
     return name
 
 
@@ -252,7 +250,7 @@ class ActionModule(_ActionModule):
       m = re.search(r'Name: (.*)$', section, re.M)
       if m:
         name = m.group(1)
-        name = self.normalize_interface_name(name)
+        name = self.normalize_name(name)
       else:
         continue
 
@@ -667,12 +665,20 @@ class ActionModule(_ActionModule):
       return 'failed to investigate existing interfaces.'
 
     for want in want_list:
+
+      # nameが省略表記されていても大丈夫なように正規化する
+      name = want.get('name')
+      norm_name = self.normalize_name(name)
+      if norm_name != name:
+        want['name_input'] = name
+        want['name'] = norm_name
+        name = norm_name
+
       state = want.get('state')
       # presentのときのみ検証する
       if state != 'present':
         continue
 
-      name = want.get('name')
       have = self.search_obj_in_list(name, have_list)
       if have:
         msg = self.validate(want, have, vlan_list)

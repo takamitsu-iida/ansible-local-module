@@ -45,6 +45,45 @@ class ActionModule(_ActionModule):
   supported_params = ('group', 'mode', 'members')
 
 
+  @staticmethod
+  def search_obj_in_list(want, have_list):
+    want_group = want.get('group')
+    for have in have_list:
+      if have.get('group') == want_group:
+        return have
+    return None
+
+
+  @staticmethod
+  def normalize_name(name):
+
+    intf_map = {
+      'E': 'Ethernet',
+      'F': 'FastEthernet',
+      'G': 'GigabitEthernet',
+      'TE': 'TenGigabitEthernet',
+      'TU': 'Tunnel',
+      'MG': 'Mgmt',
+      'L': 'Loopback',
+      'P': 'Port-channel',
+      'V': 'Vlan',
+      'S': 'Serial'
+    }
+
+    # nameが省略表記の場合はフルネームに置き換える
+    if name:
+      match = re.match(r'^(?P<intfname>[A-Za-z-]+)(\s+)?(?P<intfnum>\d+.*)', name)
+      if match:
+        intfname = match.group('intfname')
+        intfnum = match.group('intfnum')
+
+        for k, v in intf_map.items():
+          if intfname.upper().startswith(k):
+            return '{}{}'.format(v, intfnum)
+
+    return name
+
+
   def validate_mode(self, want):
     key = 'mode'
     mode = want.get(key)
@@ -76,7 +115,13 @@ class ActionModule(_ActionModule):
     key = 'members'
     members = want.get(key)
     if members and isinstance(members, str):
-      want[key] = [members]
+      members = [members]
+      want[key] = members
+
+    for i, name in enumerate(members):
+      norm_name = self.normalize_name(name)
+      if norm_name != name:
+        members[i] = norm_name
 
 
   def validate(self, want_list):
@@ -96,15 +141,6 @@ class ActionModule(_ActionModule):
           msg = validator(want)
           if msg:
             return msg
-
-
-  @staticmethod
-  def search_obj_in_list(want, have_list):
-    want_group = want.get('group')
-    for have in have_list:
-      if have.get('group') == want_group:
-        return have
-    return None
 
 
   def equals_to(self, want, have):

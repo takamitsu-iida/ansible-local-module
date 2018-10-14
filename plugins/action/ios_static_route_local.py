@@ -101,14 +101,43 @@ class ActionModule(_ActionModule):
 
 
   @staticmethod
+  def normalize_name(name):
+
+    intf_map = {
+      'E': 'Ethernet',
+      'F': 'FastEthernet',
+      'G': 'GigabitEthernet',
+      'TE': 'TenGigabitEthernet',
+      'TU': 'Tunnel',
+      'MG': 'Mgmt',
+      'L': 'Loopback',
+      'P': 'Port-channel',
+      'V': 'Vlan',
+      'S': 'Serial'
+    }
+
+    # nameが省略表記の場合はフルネームに置き換える
+    if name:
+      match = re.match(r'^(?P<intfname>[A-Za-z-]+)(\s+)?(?P<intfnum>\d+.*)', name)
+      if match:
+        intfname = match.group('intfname')
+        intfnum = match.group('intfnum')
+
+        for k, v in intf_map.items():
+          if intfname.upper().startswith(k):
+            return '{}{}'.format(v, intfnum)
+
+    return name
+
+
+  @staticmethod
   def bool_to_str(obj, key):
     v = obj.get(key)
     if v and isinstance(v, bool):
       obj[key] = key
 
 
-  @staticmethod
-  def validate_prefix(obj):
+  def validate_prefix(self, obj):
     value = obj.get('prefix')
     if value is None:
       return 'prefix is required.'
@@ -118,8 +147,7 @@ class ActionModule(_ActionModule):
       return 'prefix: {}'.format(to_text(e))
 
 
-  @staticmethod
-  def validate_nh_addr(obj):
+  def validate_nh_addr(self, obj):
     value = obj.get('nh_addr')
     if value is None:
       if obj.get('dhcp') is None:
@@ -131,8 +159,14 @@ class ActionModule(_ActionModule):
         return 'nh_addr: {}'.format(to_text(e))
 
 
-  @staticmethod
-  def validate_netmask(obj):
+  def validate_nh_intf(self, obj):
+    name = obj.get('nh_intf')
+    norm_name = self.normalize_name(name)
+    if norm_name != name:
+      obj['nh_intf'] = norm_name
+
+
+  def validate_netmask(self, obj):
     value = obj.get('netmask')
     if value is None:
       return 'netmask is required.'
@@ -144,8 +178,7 @@ class ActionModule(_ActionModule):
       return 'netmask: {}'.format(to_text(e))
 
 
-  @staticmethod
-  def validate_ad(obj):
+  def validate_ad(self, obj):
     key = 'ad'
     value = obj.get(key)
     if value is not None:
@@ -161,8 +194,7 @@ class ActionModule(_ActionModule):
         return '{}: {}'.format(key, to_text(e))
 
 
-  @staticmethod
-  def validate_tag(obj):
+  def validate_tag(self, obj):
     key = 'tag'
     value = obj.get(key)
     if value is not None:
@@ -178,8 +210,7 @@ class ActionModule(_ActionModule):
         return '{}: {}'.format(key, to_text(e))
 
 
-  @staticmethod
-  def validate_track(obj):
+  def validate_track(self, obj):
     key = 'track'
     value = obj.get(key)
     if value is not None:
