@@ -1,11 +1,12 @@
+<!-- markdownlint-disable MD001 -->
 <!-- markdownlint-disable MD012 -->
 <!-- markdownlint-disable MD036 -->
 
 # Ansibleローカルモジュール
 
-<br>
+<br><br>
 
-Takamitsu IIDA (@takamitsu-iida)
+##### Takamitsu IIDA (@takamitsu-iida)
 
 ---
 
