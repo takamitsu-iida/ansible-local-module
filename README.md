@@ -315,8 +315,4 @@ ios_configモジュールは親子関係を指定する必要があるため少�
 
 ## Presentation Decks
 
-reveal.jsの練習用
-
-もう少し字が小さめのスタイルシートがほしいな。
-
 - [ローカルモジュールとは](https://takamitsu-iida.github.io/ansible-local-module/decks/index.html)
