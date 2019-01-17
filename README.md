@@ -315,4 +315,4 @@ ios_configモジュールは親子関係を指定する必要があるため少�
 
 ## Presentation Decks
 
-- [ローカルモジュールとは](https://takamitsu-iida.github.io/ansible-local-module/decks/index.html)
+<https://takamitsu-iida.github.io/decks/ansible-local-module/>
