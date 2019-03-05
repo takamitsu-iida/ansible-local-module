@@ -159,8 +159,8 @@ def main():
     name=dict(type='str'),
     state=dict(default='present', choices=['present', 'absent', 'unconfigured']),
     mode=dict(choices=['access', 'trunk']),
-    access_vlan=dict(type='str'),
-    native_vlan=dict(type='str'),
+    access_vlan=dict(type='int'),
+    native_vlan=dict(type='int'),
     trunk_vlans=dict(type='str'),
     nonegotiate=dict(type='bool')
   )

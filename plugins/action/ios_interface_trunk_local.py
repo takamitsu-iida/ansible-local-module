@@ -332,11 +332,11 @@ class ActionModule(_ActionModule):
     for p in self.supported_params:
       # そのパラメータが入力したYAMLにある場合だけwantに取り込む
       if p in args:
-        v = args.get(p)
-        # 空指定は''に置き換える
-        if v is None:
-          v = ''
-        obj[p] = v
+        value = args.get(p)
+        # 空白スペースはNoneに初期化する
+        if isinstance(value, str) and value.strip() == '':
+          value = None
+        obj[p] = value
 
     # stateは設定されていない場合'present'の扱いにする
     obj['state'] = args.get('state', 'present')
@@ -634,6 +634,22 @@ class ActionModule(_ActionModule):
     trunk_vlans = want.get('trunk_vlans')
     if trunk_vlans == '1-4094':
       want['trunk_vlans'] = 'ALL'
+
+    # VLAN番号はintに強制変換
+    access_vlan = want.get('access_vlan')
+    if access_vlan is not None and not isinstance(access_vlan, int):
+      try:
+        want['access_vlan'] = int(access_vlan)
+      except ValueError:
+        return 'access_vlan should be number, your input: {}'.format(access_vlan)
+
+    # VLAN番号はintに強制変換
+    native_vlan = want.get('native_vlan')
+    if native_vlan is not None and not isinstance(native_vlan, int):
+      try:
+        want['nativce_vlan'] = int(native_vlan)
+      except ValueError:
+        return 'native_vlan should be number, your input: {}'.format(native_vlan)
 
     # modeがおかしくないかチェックする
     mode = want.get('mode')
