@@ -91,8 +91,7 @@ def main():
   argument_spec = dict(
     show_access_list=dict(type='str'),
     show_access_list_path=dict(type='path'),
-    acl_cli=dict(type='list', required=True),
-    debug=dict(default=False, types='bool')
+    acl_cli=dict(type='list', required=True)
   )
 
   required_one_of = [

@@ -17,10 +17,10 @@ switches
 [routers]
 
 [routers:children]
-11f_routers
-18f_routers
+routers_11f
+routers_18f
 
-[11f_routers]
+[routers_11f]
 # ログイン関連情報はgroup_varsに設定し、ここには記述しない
 r1 ansible_host=172.20.0.21
 r2 ansible_host=172.20.0.22
@@ -30,7 +30,7 @@ r4 ansible_host=172.20.0.24
 [sir_routers]
 sir1 ansible_host=172.20.0.200
 
-[18f_routers]
+[routers_18f]
 # ログイン関連情報はgroup_varsに設定し、ここには記述しない
 r12 ansible_host=172.18.0.12
 r13 ansible_host=172.18.0.13
@@ -44,8 +44,8 @@ tr12 ansible_host=172.18.0.12
 tr13 ansible_host=172.18.0.13
 
 [console_routers]
-cr12 ansible_host=10.35.185.2 ansible_port=2011  # apc1-p7
-cr13 ansible_host=10.35.185.2 ansible_port=2012  # apc1-p8
+cr12 ansible_host=10.35.185.2 ansible_port=2011  # apc1_p7
+cr13 ansible_host=10.35.185.2 ansible_port=2012  # apc1_p8
 
 #
 # スイッチ
@@ -62,7 +62,7 @@ s1 ansible_host=192.168.1.200
 ts1 ansible_host=192.168.1.200
 
 [nxos_switches]
-n9kv-no1 ansible_host=172.20.0.31
+n9kv_no1 ansible_host=172.20.0.31
 
 #
 # SSH直接接続
